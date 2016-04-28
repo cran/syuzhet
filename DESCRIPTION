@@ -1,28 +1,30 @@
 Package: syuzhet
 Type: Package
 Title: Extracts Sentiment and Sentiment-Derived Plot Arcs from Text
-Version: 0.2.0
-Date: 2015-01-20
+Version: 1.0.0
+Date: 2016-04-22
 Authors@R: person("Matthew", "Jockers", email = "mjockers@gmail.com",
   role = c("aut", "cre"))
 Maintainer: Matthew Jockers <mjockers@gmail.com>
-Description: Extracts sentiment and sentiment-derived plot arcs 
-  from text using three sentiment dictionaries conveniently 
-  packaged for consumption by R users.  Implemented dictionaries include
-  "afinn" developed by Finn {\AA}rup Nielsen, "bing" developed by Minqing Hu 
-  and Bing Liu, and "nrc" developed by Mohammad, Saif M. and Turney, Peter D. 
-  Applicable references are available in README.md and in the documentation 
-  for the "get_sentiment" function.  The package also provides a method for 
-  implementing Stanford's coreNLP sentiment parser. The package provides 
-  several methods for plot arc normalization. 
+Description: Extracts sentiment and sentiment-derived plot arcs
+    from text using three sentiment dictionaries conveniently
+    packaged for consumption by R users.  Implemented dictionaries include
+    "syuzhet" (default) developed in the Nebraska Literary Lab
+    "afinn" developed by Finn {\AA}rup Nielsen, "bing" developed by Minqing Hu
+    and Bing Liu, and "nrc" developed by Mohammad, Saif M. and Turney, Peter D.
+    Applicable references are available in README.md and in the documentation
+    for the "get_sentiment" function.  The package also provides a hack for
+    implementing Stanford's coreNLP sentiment parser. The package provides
+    several methods for plot arc normalization.
 URL: https://github.com/mjockers/syuzhet
 License: GPL-3
-Imports: openNLP, NLP
+Imports: openNLP, NLP, zoo, dtt, stats, graphics
 LazyData: true
 Suggests: knitr, pander, testthat (>= 0.9.1)
 NeedsCompilation: no
 VignetteBuilder: knitr
-Packaged: 2015-02-21 22:16:27 UTC; mjockers
+RoxygenNote: 5.0.1
+Packaged: 2016-04-27 19:07:56 UTC; mjockers
 Author: Matthew Jockers [aut, cre]
 Repository: CRAN
-Date/Publication: 2015-02-22 00:24:40
+Date/Publication: 2016-04-28 00:17:58
