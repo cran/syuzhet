@@ -1,8 +1,8 @@
 Package: syuzhet
 Type: Package
 Title: Extracts Sentiment and Sentiment-Derived Plot Arcs from Text
-Version: 1.0.0
-Date: 2016-04-22
+Version: 1.0.1
+Date: 2017-03-05
 Authors@R: person("Matthew", "Jockers", email = "mjockers@gmail.com",
   role = c("aut", "cre"))
 Maintainer: Matthew Jockers <mjockers@gmail.com>
@@ -24,7 +24,7 @@ Suggests: knitr, pander, testthat (>= 0.9.1)
 NeedsCompilation: no
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
-Packaged: 2016-04-27 19:07:56 UTC; mjockers
+Packaged: 2017-03-05 22:40:57 UTC; mjockers
 Author: Matthew Jockers [aut, cre]
 Repository: CRAN
-Date/Publication: 2016-04-28 00:17:58
+Date/Publication: 2017-03-06 08:29:07

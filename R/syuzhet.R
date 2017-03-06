@@ -198,11 +198,11 @@ get_transformed_values <- function(raw_values, low_pass_size = 2, x_reverse_len 
   if(scale_vals & scale_range) stop("ERROR: scale_vals and scale_range cannot both be true.")
   if(scale_vals){
     return(scale(transformed_values))
-  } else if(scale_range & !scale_vals) {
-    return(rescale(transformed_values))
-  } else {
-    return(transformed_values)
   }
+  if(scale_range){
+    return(rescale(transformed_values))
+  }
+  return(transformed_values)
 }
 
 #' Chunk a Text and Get Means
@@ -215,13 +215,13 @@ get_transformed_values <- function(raw_values, low_pass_size = 2, x_reverse_len 
 #' @return A vector of mean values from each chunk
 #'
 get_percentage_values <- function(raw_values, bins = 100){
-  if(!is.numeric(raw_values)) stop("Input must be a numeric vector")
+  if(!is.numeric(raw_values) | !is.numeric(bins)) stop("Input must be a numeric vector")
   if(length(raw_values)/bins < 2){
     stop("Input vector needs to be twice as long as value number to make percentage based segmentation viable")
   }
   chunks <- split(raw_values, cut(1:length(raw_values),bins))
-  means = sapply(chunks, mean)
-  names(means) = 1:bins
+  means <- sapply(chunks, mean)
+  names(means) <- 1:bins
   return(means)
 }
 
@@ -277,32 +277,41 @@ rescale_x_2 <- function(v){
 }
 
 #' Plots simple and rolling shapes overlayed
-#' @description A Simple function for comparing three smoothers
+#' @description A simple function for comparing three smoothers
 #' @param raw_values the raw sentiment values
 #' calculated for each sentence
-#' @param title for image
+#' @param title for resulting image
 #' @param legend_pos positon for legend
+#' @param lps size of the low pass filter. I.e. the number of low frequency components to retain
+#' @param window size of the rolling window for the rolling mean expressed as a percentage.
 #' @export
-simple_plot <- function(raw_values, title="Syuzhet Plot", legend_pos="top"){
-  wdw <- round(length(raw_values)*.1) # wdw = 10% of length
+simple_plot <- function (raw_values, title = "Syuzhet Plot", legend_pos = "top", lps=10, window = 0.1){
+  wdw <- round(length(raw_values) * window)
   rolled <- rescale(zoo::rollmean(raw_values, k = wdw, fill = 0))
   half <- round(wdw/2)
   rolled[1:half] <- NA
   end <- length(rolled) - half
   rolled[end:length(rolled)] <- NA
-  trans <- get_dct_transform(raw_values, x_reverse_len = length(raw_values), scale_range = T)
+  trans <- get_dct_transform(raw_values, low_pass_size = lps, x_reverse_len = length(raw_values), 
+                             scale_range = T)
   x <- 1:length(raw_values)
   y <- raw_values
-  raw_lo <- stats::loess(y ~ x, span=.5)
+  raw_lo <- stats::loess(y ~ x, span = 0.5)
   low_line <- rescale(stats::predict(raw_lo))
-  graphics::par(mfrow=c(2, 1))
-  graphics::plot(low_line, type = "l", ylim = c(-1,1), main = title, xlab = "Full Narrative Time", ylab = "Scaled Sentiment")
-  graphics::lines(rolled, col="blue")
-  graphics::lines(trans, col="red")
-  graphics::legend(legend_pos, c("Loess Smooth", "Rolling Mean", "Syuzhet DCT"), lty=1, lwd=1,col=c('black', 'blue', 'red'), bty='n', cex=.75)
-  normed_trans <- get_dct_transform(raw_values, scale_range = T)
-  graphics::plot(normed_trans,type = "l", ylim = c(-1,1), main = "Normalized Simple Shape", xlab = "Normalized Narrative Time", ylab = "Scaled Sentiment", col="red")
-  graphics::par(mfrow=c(1, 1))
+  graphics::par(mfrow = c(2, 1))
+  graphics::plot(low_line, type = "l", ylim = c(-1, 1), main = title, 
+                 xlab = "Full Narrative Time", ylab = "Scaled Sentiment", col="blue", lty = 2)
+  graphics::lines(rolled, col = "grey", lty = 2)
+  graphics::lines(trans, col = "red")
+  graphics::abline(h=0, lty=3)
+  graphics::legend(legend_pos, c("Loess Smooth", "Rolling Mean", 
+                                 "Syuzhet DCT"), lty = 1, lwd = 1, col = c("blue", "grey", 
+                                                                           "red"), bty = "n", cex = 0.75)
+  normed_trans <- get_dct_transform(raw_values, scale_range = T, low_pass_size = 5)
+  graphics::plot(normed_trans, type = "l", ylim = c(-1, 1), 
+                 main = "Simplified Macro Shape", xlab = "Normalized Narrative Time", 
+                 ylab = "Scaled Sentiment", col = "red")
+  graphics::par(mfrow = c(1, 1))
 }
 
 #' Discrete Cosine Transformation with Reverse Transform.
@@ -340,11 +349,30 @@ get_dct_transform <- function(raw_values, low_pass_size = 5, x_reverse_len = 100
   if (scale_vals) {
     return(scale(dct_out))
   }
-  else if (scale_range & !scale_vals) {
+  if(scale_range) {
     return(rescale(dct_out))
   }
-  else {
-    return(dct_out)
-  }
+  return(dct_out)
 }
 
+#' Sentiment Dictionaries
+#' @description
+#' Get the sentiment dictionaries used in \pkg{syuzhet}.
+#' @param dictionary A string indicating which sentiment dictionary to return.  Options include "syuzhet", "bing", "afinn", and "nrc".
+#' @return A \code{\link[base]{data.frame}} 
+#' @examples
+#' get_sentiment_dictionary()
+#' get_sentiment_dictionary('bing')
+#' get_sentiment_dictionary('afinn')
+#' get_sentiment_dictionary('nrc')
+#' @export
+#'
+get_sentiment_dictionary <- function(dictionary = 'syuzhet'){
+    switch(dictionary,
+        syuzhet = syuzhet_dict,
+        bing = bing,
+        nrc = nrc,
+        afinn = afinn,
+        stop("Must be one of: 'syuzhet', 'bing', 'nrc', or 'afinn'")
+    )
+}
