@@ -4,12 +4,14 @@
 \alias{get_sent_values}
 \title{Assigns Sentiment Values}
 \usage{
-get_sent_values(char_v, method = "syuzhet")
+get_sent_values(char_v, method = "syuzhet", lexicon = NULL)
 }
 \arguments{
 \item{char_v}{A string}
 
 \item{method}{A string indicating which sentiment dictionary to use}
+
+\item{lexicon}{A data frame with with at least two columns named word and value. Works with "nrc" or "custom" method.  If using custom method, you must load a custom lexicon as a data frame with aforementioend columns.}
 }
 \value{
 A single numerical value (positive or negative)
@@ -18,4 +20,3 @@ based on the assessed sentiment in the string
 \description{
 Assigns sentiment values to words based on preloaded dictionary. The default is the syuzhet dictionary.
 }
-

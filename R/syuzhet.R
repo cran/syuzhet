@@ -1,6 +1,6 @@
 #' Load Text from a File
 #' @description
-#' Loads a file as a single text sting. 
+#' Loads a file as a single text string. 
 #' @param path_to_file file path
 #' @export
 #' @return A character vector of length 1 containing the text of the file in the path_to_file argument.
@@ -27,30 +27,59 @@ get_tokens <- function(text_of_file, pattern = "\\W"){
 #' @description
 #' Parses a string into a vector of sentences.
 #' @param text_of_file A Text String
-#' @param strip_quotes Logical. Default of TRUE results in 
-#' removal of quote marks from text input prior to sentence 
-#' parsing.
+#' @param fix_curly_quotes logical.  If \code{TRUE} curly quotes will be 
+#' converted to ASCII representation before splitting.
+#' @param as_vector If \code{TRUE} the result is unlisted.  If \code{FALSE}
+#' the result stays as a list of the original text string elements split into 
+#' sentences.
 #' @return A Character Vector of Sentences
 #' @export
+#' @examples
+#' (x <- c(paste0(
+#'     "Mr. Brown comes! He says hello. i give him coffee.  i will ",
+#'     "go at 5 p. m. eastern time.  Or somewhere in between!go there"
+#' ),
+#' paste0(
+#'     "Marvin K. Mooney Will You Please Go Now!", "The time has come.",
+#'     "The time has come. The time is now. Just go. Go. GO!",
+#'     "I don't care how."
+#' )))
 #' 
-get_sentences <- function(text_of_file, strip_quotes = TRUE){
+#' get_sentences(x)
+#' get_sentences(x, as_vector = FALSE)
+#' 
+#' 
+
+get_sentences <- function(text_of_file, fix_curly_quotes = TRUE, as_vector = TRUE){
   if (!is.character(text_of_file)) stop("Data must be a character vector.")
-  text_of_file <- NLP::as.String(text_of_file)
-  if(strip_quotes){
-    text_of_file <- gsub("\"", "", text_of_file)
-  }
-  sent_token_annotator <- openNLP::Maxent_Sent_Token_Annotator()
-  sentence_bounds <- NLP::annotate(text_of_file, sent_token_annotator)
-  text_of_file[sentence_bounds]
+  if (isTRUE(fix_curly_quotes)) text_of_file <- replace_curly(text_of_file)
+  splits <- textshape::split_sentence(text_of_file)
+  if (isTRUE(as_vector)) splits <- unlist(splits)
+  splits
 }
+
+## helper curly quote replacement function
+replace_curly <- function(x, ...){
+    replaces <- c('\x91', '\x92', '\x93', '\x94')
+    Encoding(replaces) <- "latin1"
+    for (i in 1:4) {
+        x <- gsub(replaces[i], c("'", "'", "\"", "\"")[i], x, fixed = TRUE)
+    }
+    x
+}
+
 
 #' Get Sentiment Values for a String
 #' @description
-#' Iterates over a vector of strings and returns sentiment values based on user supplied method. The default method, "syuzhet" is a custom sentiment dictionary developed in the Nebraska Literary Lab.  The default dictionary should be better tuned to fiction as the terms were extracted from a collection of 165,000 human coded sentences taken from a small corpus of contemporary novels.
+#' Iterates over a vector of strings and returns sentiment values based on user supplied method. The default method, "syuzhet" is a custom sentiment dictionary developed in the Nebraska Literary Lab.  The default dictionary should be better tuned to fiction as the terms were extracted from a collection of 165,000 human coded sentences taken from a small corpus of contemporary novels.   
+#' At the time of this release, Syuzhet will only work with languages that use Latin character sets.  This effectively means that "Arabic", "Bengali", "Chinese_simplified", "Chinese_traditional", "Greek", "Gujarati", "Hebrew", "Hindi", "Japanese", "Marathi", "Persian", "Russian", "Tamil", "Telugu", "Thai", "Ukranian", "Urdu", "Yiddish" are not supported even though these languages are part of the extended NRC dictionary.
 #' 
 #' @param char_v A vector of strings for evaluation.
 #' @param method A string indicating which sentiment method to use. Options include "syuzhet", "bing", "afinn", "nrc" and "stanford."  See references for more detail on methods.
-#' 
+#' @param language A string. Only works for "nrc" method
+#' @param cl Optional, for parallel sentiment analysis.
+#' @param path_to_tagger local path to location of Stanford CoreNLP package
+#' @param lexicon a data frame with at least two columns labeled "word" and "value."
 #' @references Bing Liu, Minqing Hu and Junsheng Cheng. "Opinion Observer: Analyzing and Comparing Opinions on the Web." Proceedings of the 14th International World Wide Web conference (WWW-2005), May 10-14, 2005, Chiba, Japan.  
 #' 
 #' @references Minqing Hu and Bing Liu. "Mining and Summarizing Customer Reviews." Proceedings of the ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD-2004), Aug 22-25, 2004, Seattle, Washington, USA.  See: http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#lexicon
@@ -63,24 +92,39 @@ get_sentences <- function(text_of_file, strip_quotes = TRUE){
 #' 
 #' @references Richard Socher, Alex Perelygin, Jean Wu, Jason Chuang, Christopher Manning, Andrew Ng and Christopher Potts.  "Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank Conference on Empirical Methods in Natural Language Processing" (EMNLP 2013).  See: http://nlp.stanford.edu/sentiment/
 #' 
-#' @param path_to_tagger local path to location of Stanford CoreNLP package
 #' @return Return value is a numeric vector of sentiment values, one value for each input sentence.
 #' @export
 #' 
-get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL){
-  if(is.na(pmatch(method, c("syuzhet", "afinn", "bing", "nrc", "stanford")))) stop("Invalid Method")
+get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL, cl=NULL, language = "english", lexicon = NULL){
+  language <- tolower(language)
+  if(is.na(pmatch(method, c("syuzhet", "afinn", "bing", "nrc", "stanford", "custom")))) stop("Invalid Method")
   if(!is.character(char_v)) stop("Data must be a character vector.")
+  if(!is.null(cl) && !inherits(cl, 'cluster')) stop("Invalid Cluster")
+  if(language %in% tolower(c("Arabic", "Bengali", "Chinese_simplified", "Chinese_traditional", "Greek", "Gujarati", "Hebrew", "Hindi", "Japanese", "Marathi", "Persian", "Russian", "Tamil", "Telugu", "Thai", "Ukranian", "Urdu", "Yiddish"))) stop ("Sorry, your language choice is not yet supported.")
   if(method == "syuzhet"){
-    char_v <- gsub("-", "", char_v) #syuzhet lexicon removes hyphens from compound words.
+    char_v <- gsub("-", "", char_v) # syuzhet lexicon removes hyphens from compound words.
   }
   if(method == "afinn" || method == "bing" || method == "syuzhet"){
     word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
-    result <- unlist(lapply(word_l, get_sent_values, method))
+    if(is.null(cl)){
+      result <- unlist(lapply(word_l, get_sent_values, method))
+    }
+    else {
+      result <- unlist(parallel::parLapply(cl=cl, word_l, get_sent_values, method))
+    }
   }
-  else if(method == "nrc"){
-    result <- get_nrc_sentiment(char_v)
-    result <- (result$negative*-1) + result$positive
+  else if(method == "nrc"){ 
+    # TODO Try parallelize nrc sentiment
+    word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
+    # lexicon <- nrc[which(nrc$lang == language & nrc$sentiment %in% c("positive", "negative")),]
+    lexicon <- dplyr::filter_(nrc, ~lang == tolower(language), ~sentiment %in% c("positive", "negative"))
+    lexicon[which(lexicon$sentiment == "negative"), "value"] <- -1
+    result <- unlist(lapply(word_l, get_sent_values, method, lexicon))
   } 
+  else if(method == "custom"){
+    word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
+    result <- unlist(lapply(word_l, get_sent_values, method, lexicon))
+  }
   else if(method == "stanford") {
     if(is.null(path_to_tagger)) stop("You must include a path to your installation of the coreNLP package.  See http://nlp.stanford.edu/software/corenlp.shtml")
     result <- get_stanford_sentiment(char_v, path_to_tagger)
@@ -93,11 +137,12 @@ get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL){
 #' Assigns sentiment values to words based on preloaded dictionary. The default is the syuzhet dictionary.
 #' @param char_v A string
 #' @param method A string indicating which sentiment dictionary to use
+#' @param lexicon A data frame with with at least two columns named word and value. Works with "nrc" or "custom" method.  If using custom method, you must load a custom lexicon as a data frame with aforementioend columns.
 #' @return A single numerical value (positive or negative)
 #' based on the assessed sentiment in the string
 #' @export
 #'
-get_sent_values <- function(char_v, method = "syuzhet"){
+get_sent_values <- function(char_v, method = "syuzhet", lexicon = NULL){
   if(method == "bing") {
     result <- sum(bing[which(bing$word %in% char_v), "value"])
   }
@@ -108,8 +153,9 @@ get_sent_values <- function(char_v, method = "syuzhet"){
     char_v <- gsub("-", "", char_v)
     result <- sum(syuzhet_dict[which(syuzhet_dict$word %in% char_v), "value"])
   }
-  else if(method == "nrc") {
-    result <- get_nrc_sentiment(char_v)
+  else if(method == "nrc" || method == "custom") {
+    data <- dplyr::filter_(lexicon, ~word %in% char_v)
+    result <- sum(data$value)
   }
   return(result)
 }
@@ -121,6 +167,8 @@ get_sent_values <- function(char_v, method = "syuzhet"){
 #' corresponding valence in a text file.
 #' 
 #' @param char_v A character vector
+#' @param language A string
+#' @param cl Optional, for parallel analysis
 #' @return A data frame where each row represents a sentence
 #' from the original file.  The columns include one for each
 #' emotion type as well as a positive or negative valence.  
@@ -128,10 +176,18 @@ get_sent_values <- function(char_v, method = "syuzhet"){
 #' @references Saif Mohammad and Peter Turney.  "Emotions Evoked by Common Words and Phrases: Using Mechanical Turk to Create an Emotion Lexicon." In Proceedings of the NAACL-HLT 2010 Workshop on Computational Approaches to Analysis and Generation of Emotion in Text, June 2010, LA, California.  See: http://saifmohammad.com/WebPages/lexicons.html
 #'
 #' @export
-get_nrc_sentiment <- function(char_v){
+get_nrc_sentiment <- function(char_v, cl=NULL, language = "english"){
   if (!is.character(char_v)) stop("Data must be a character vector.")
+  if(!is.null(cl) && !inherits(cl, 'cluster')) stop("Invalid Cluster")
+  lexicon <- dplyr::filter_(nrc, ~lang == language) # filter lexicon to language
   word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
-  nrc_data <- lapply(word_l, get_nrc_values)
+  
+  if(is.null(cl)){
+    nrc_data <- lapply(word_l, get_nrc_values, lexicon = lexicon)
+  }
+  else{
+    nrc_data <- parallel::parLapply(cl=cl, word_l, lexicon = lexicon, get_nrc_values)
+  }
   result_df <- as.data.frame(do.call(rbind, nrc_data), stringsAsFactors=F)
   # reorder the columns
   my_col_order <- c(
@@ -154,16 +210,35 @@ get_nrc_sentiment <- function(char_v){
 #' Access the NRC dictionary to compute emotion types and
 #' valence for a set of words in the input vector.
 #' @param word_vector A character vector.
+#' @param language A string
+#' @param lexicon A data frame with at least the columns "word", "sentiment" and "value". If NULL, internal data will be taken.
 #' @return A vector of values for the emotions and valence
 #' detected in the input vector.
 #' @export
-get_nrc_values <- function(word_vector){
-  colSums(nrc[which(rownames(nrc) %in% word_vector), ])
+get_nrc_values <- function(word_vector, language = "english", lexicon = NULL){
+  if (is.null(lexicon)) {
+    lexicon <- dplyr::filter_(nrc, ~lang == language)
+  }
+  # if (! all(c("word", "sentiment", "value") %in% names(lexicon)))
+  #    stop("lexicon must have a 'word', a 'sentiment' and a 'value' field")
+
+  data <- dplyr::filter_(lexicon, ~word %in% word_vector)
+  data <- dplyr::group_by_(data, ~sentiment)
+  data <- dplyr::summarise_at(data, "value", sum)
+
+  all_sent <- unique(lexicon$sentiment)
+  sent_present <- unique(data$sentiment)
+  sent_absent  <- setdiff(all_sent, sent_present)
+  if (length(sent_absent) > 0) {
+    missing_data <- dplyr::data_frame(sentiment = sent_absent, value = 0)
+    data <- rbind(data, missing_data)
+  }
+  tidyr::spread_(data, "sentiment", "value")
 }
 
 #' Fourier Transform and Reverse Transform Values
 #' @description 
-#' Converts input values into a standardized set of filtered and reverse transformed values for easy plotting and/or comparison.
+#' Please Note: This function is maintained for legacy purposes.  Users should consider using get_dct_transform() instead. Converts input values into a standardized set of filtered and reverse transformed values for easy plotting and/or comparison. 
 #' @param raw_values the raw sentiment values calculated for each sentence
 #' @param low_pass_size The number of components to retain in the low pass filtering. Default = 3
 #' @param x_reverse_len the number of values to return. Default = 100
@@ -181,6 +256,7 @@ get_nrc_values <- function(word_vector){
 #' @export 
 #' 
 get_transformed_values <- function(raw_values, low_pass_size = 2, x_reverse_len = 100, padding_factor = 2, scale_vals = FALSE, scale_range = FALSE){
+  warning('This function is maintained for legacy purposes.  Consider using get_dct_transform() instead.')
   if(!is.numeric(raw_values)) stop("Input must be an numeric vector")
   if(low_pass_size > length(raw_values)) stop("low_pass_size must be less than or equal to the length of raw_values input vector")
   raw_values.len <- length(raw_values)
@@ -267,7 +343,7 @@ rescale <- function(x){
 #' @description
 #' Rescales input values to two scales (0 to 1 and  -1 to 1) on the y-axis and also creates a scaled vector of x axis values from 0 to 1.  This function is useful for plotting and plot comparison.
 #' @param v A vector of values
-#' @return A list of three vectors (x, y, z).  x is a vector of values from 0 to 1 equal in length to the input vector v. y is a scaled (from 0 to 1) vector of the input values equal in lenght to the input vector v. z is a scaled (from -1 to +1) vector of the input values equal in length to the input vector v.
+#' @return A list of three vectors (x, y, z).  x is a vector of values from 0 to 1 equal in length to the input vector v. y is a scaled (from 0 to 1) vector of the input values equal in length to the input vector v. z is a scaled (from -1 to +1) vector of the input values equal in length to the input vector v.
 #' @export
 rescale_x_2 <- function(v){
   x <- 1:length(v)/length(v)
@@ -281,7 +357,7 @@ rescale_x_2 <- function(v){
 #' @param raw_values the raw sentiment values
 #' calculated for each sentence
 #' @param title for resulting image
-#' @param legend_pos positon for legend
+#' @param legend_pos position for legend
 #' @param lps size of the low pass filter. I.e. the number of low frequency components to retain
 #' @param window size of the rolling window for the rolling mean expressed as a percentage.
 #' @export
@@ -359,20 +435,25 @@ get_dct_transform <- function(raw_values, low_pass_size = 5, x_reverse_len = 100
 #' @description
 #' Get the sentiment dictionaries used in \pkg{syuzhet}.
 #' @param dictionary A string indicating which sentiment dictionary to return.  Options include "syuzhet", "bing", "afinn", and "nrc".
-#' @return A \code{\link[base]{data.frame}} 
+#' @param language A string indicating the language to choose if using the NRC dictionary and a language other than English
+#' #' @return A \code{\link[base]{data.frame}} 
 #' @examples
 #' get_sentiment_dictionary()
 #' get_sentiment_dictionary('bing')
 #' get_sentiment_dictionary('afinn')
-#' get_sentiment_dictionary('nrc')
+#' get_sentiment_dictionary('nrc', language = "spanish")
 #' @export
 #'
-get_sentiment_dictionary <- function(dictionary = 'syuzhet'){
-    switch(dictionary,
+get_sentiment_dictionary <- function(dictionary = 'syuzhet', language = 'english'){
+    dict <- switch(dictionary,
         syuzhet = syuzhet_dict,
         bing = bing,
         nrc = nrc,
         afinn = afinn,
         stop("Must be one of: 'syuzhet', 'bing', 'nrc', or 'afinn'")
     )
+    if(dictionary == 'nrc'){
+      dict <- dplyr::filter_(dict, ~lang == language)
+    }
+    return(dict)
 }
