@@ -15,12 +15,16 @@ get_text_as_string <- function(path_to_file){
 #' Parses a string into a vector of word tokens.
 #' @param text_of_file A Text String
 #' @param pattern A regular expression for token breaking
+#' @param lowercase should tokens be converted to lowercase. Default equals TRUE
 #' @return A Character Vector of Words
 #' @export
 #' 
-get_tokens <- function(text_of_file, pattern = "\\W"){
+get_tokens <- function(text_of_file, pattern = "\\W", lowercase = TRUE){
+  if(lowercase){
+    text_of_file <- tolower(text_of_file)
+  }
   tokens <- unlist(strsplit(text_of_file, pattern))
-  tolower(tokens[which(tokens != "")])
+  tokens[which(tokens != "")]
 }
 
 #' Sentence Tokenization
@@ -80,22 +84,28 @@ replace_curly <- function(x, ...){
 #' @param cl Optional, for parallel sentiment analysis.
 #' @param path_to_tagger local path to location of Stanford CoreNLP package
 #' @param lexicon a data frame with at least two columns labeled "word" and "value."
+#' @param regex A regular expression for splitting words.  Default is "[^A-Za-z']+"
+#' @param lowercase should tokens be converted to lowercase. Default equals TRUE
 #' @references Bing Liu, Minqing Hu and Junsheng Cheng. "Opinion Observer: Analyzing and Comparing Opinions on the Web." Proceedings of the 14th International World Wide Web conference (WWW-2005), May 10-14, 2005, Chiba, Japan.  
 #' 
 #' @references Minqing Hu and Bing Liu. "Mining and Summarizing Customer Reviews." Proceedings of the ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD-2004), Aug 22-25, 2004, Seattle, Washington, USA.  See: http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html#lexicon
 #' 
 #' @references Saif Mohammad and Peter Turney.  "Emotions Evoked by Common Words and Phrases: Using Mechanical Turk to Create an Emotion Lexicon." In Proceedings of the NAACL-HLT 2010 Workshop on Computational Approaches to Analysis and Generation of Emotion in Text, June 2010, LA, California.  See: http://saifmohammad.com/WebPages/lexicons.html
 #' 
-#' @references Finn Arup Nielsen. "A new ANEW: Evaluation of a word list for sentiment analysis in microblogs", Proceedings of the ESWC2011 Workshop on 'Making Sense of Microposts':Big things come in small packages 718 in CEUR Workshop Proceedings : 93-98. 2011 May. http://arxiv.org/abs/1103.2903. See: http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010
+#' @references Finn Årup Nielsen. "A new ANEW: Evaluation of a word list for sentiment analysis in microblogs", Proceedings of the ESWC2011 Workshop on 'Making Sense of Microposts':Big things come in small packages 718 in CEUR Workshop Proceedings : 93-98. 2011 May. http://arxiv.org/abs/1103.2903. See: http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010
 #' 
 #' @references Manning, Christopher D., Surdeanu, Mihai, Bauer, John, Finkel, Jenny, Bethard, Steven J., and McClosky, David. 2014. The Stanford CoreNLP Natural Language Processing Toolkit. In Proceedings of 52nd Annual Meeting of the Association for Computational Linguistics: System Demonstrations, pp. 55-60.  See: http://nlp.stanford.edu/software/corenlp.shtml
 #' 
 #' @references Richard Socher, Alex Perelygin, Jean Wu, Jason Chuang, Christopher Manning, Andrew Ng and Christopher Potts.  "Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank Conference on Empirical Methods in Natural Language Processing" (EMNLP 2013).  See: http://nlp.stanford.edu/sentiment/
 #' 
 #' @return Return value is a numeric vector of sentiment values, one value for each input sentence.
+#' @importFrom rlang .data
 #' @export
 #' 
-get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL, cl=NULL, language = "english", lexicon = NULL){
+get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL, cl=NULL, language = "english", lexicon = NULL, regex = "[^A-Za-z']+", lowercase = TRUE){
+  if(lowercase == TRUE){
+    char_v <- tolower(char_v)
+  }
   language <- tolower(language)
   if(is.na(pmatch(method, c("syuzhet", "afinn", "bing", "nrc", "stanford", "custom")))) stop("Invalid Method")
   if(!is.character(char_v)) stop("Data must be a character vector.")
@@ -105,7 +115,7 @@ get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL, cl=
     char_v <- gsub("-", "", char_v) # syuzhet lexicon removes hyphens from compound words.
   }
   if(method == "afinn" || method == "bing" || method == "syuzhet"){
-    word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
+    word_l <- strsplit(char_v, regex)
     if(is.null(cl)){
       result <- unlist(lapply(word_l, get_sent_values, method))
     }
@@ -115,14 +125,17 @@ get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL, cl=
   }
   else if(method == "nrc"){ 
     # TODO Try parallelize nrc sentiment
-    word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
+    word_l <- strsplit(char_v, regex)
     # lexicon <- nrc[which(nrc$lang == language & nrc$sentiment %in% c("positive", "negative")),]
-    lexicon <- dplyr::filter_(nrc, ~lang == tolower(language), ~sentiment %in% c("positive", "negative"))
+    lexicon <- dplyr::filter(nrc, .data$lang == tolower(language), .data$sentiment %in% c("positive", "negative"))
     lexicon[which(lexicon$sentiment == "negative"), "value"] <- -1
+    if(lowercase){
+      lexicon$word <- tolower(lexicon$word)
+    }
     result <- unlist(lapply(word_l, get_sent_values, method, lexicon))
   } 
   else if(method == "custom"){
-    word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
+    word_l <- strsplit(char_v, regex)
     result <- unlist(lapply(word_l, get_sent_values, method, lexicon))
   }
   else if(method == "stanford") {
@@ -141,7 +154,8 @@ get_sentiment <- function(char_v, method = "syuzhet", path_to_tagger = NULL, cl=
 #' @return A single numerical value (positive or negative)
 #' based on the assessed sentiment in the string
 #' @export
-#'
+#' @importFrom rlang .data
+#' 
 get_sent_values <- function(char_v, method = "syuzhet", lexicon = NULL){
   if(method == "bing") {
     result <- sum(bing[which(bing$word %in% char_v), "value"])
@@ -154,7 +168,7 @@ get_sent_values <- function(char_v, method = "syuzhet", lexicon = NULL){
     result <- sum(syuzhet_dict[which(syuzhet_dict$word %in% char_v), "value"])
   }
   else if(method == "nrc" || method == "custom") {
-    data <- dplyr::filter_(lexicon, ~word %in% char_v)
+    data <- dplyr::filter(lexicon, .data$word %in% char_v)
     result <- sum(data$value)
   }
   return(result)
@@ -169,18 +183,22 @@ get_sent_values <- function(char_v, method = "syuzhet", lexicon = NULL){
 #' @param char_v A character vector
 #' @param language A string
 #' @param cl Optional, for parallel analysis
+#' @param lowercase should tokens be converted to lowercase. Default equals TRUE
 #' @return A data frame where each row represents a sentence
 #' from the original file.  The columns include one for each
 #' emotion type as well as a positive or negative valence.  
 #' The ten columns are as follows: "anger", "anticipation", "disgust", "fear", "joy", "sadness", "surprise", "trust", "negative", "positive." 
 #' @references Saif Mohammad and Peter Turney.  "Emotions Evoked by Common Words and Phrases: Using Mechanical Turk to Create an Emotion Lexicon." In Proceedings of the NAACL-HLT 2010 Workshop on Computational Approaches to Analysis and Generation of Emotion in Text, June 2010, LA, California.  See: http://saifmohammad.com/WebPages/lexicons.html
-#'
+#' @importFrom rlang .data
 #' @export
-get_nrc_sentiment <- function(char_v, cl=NULL, language = "english"){
+get_nrc_sentiment <- function(char_v, cl=NULL, language = "english", lowercase = TRUE){
   if (!is.character(char_v)) stop("Data must be a character vector.")
   if(!is.null(cl) && !inherits(cl, 'cluster')) stop("Invalid Cluster")
-  lexicon <- dplyr::filter_(nrc, ~lang == language) # filter lexicon to language
-  word_l <- strsplit(tolower(char_v), "[^A-Za-z']+")
+  lexicon <- dplyr::filter(nrc, .data$lang == language) # filter lexicon to language
+  if(lowercase){
+    char_v <- tolower(char_v)
+  }
+  word_l <- strsplit(char_v, "[^A-Za-z']+")
   
   if(is.null(cl)){
     nrc_data <- lapply(word_l, get_nrc_values, lexicon = lexicon)
@@ -214,23 +232,24 @@ get_nrc_sentiment <- function(char_v, cl=NULL, language = "english"){
 #' @param lexicon A data frame with at least the columns "word", "sentiment" and "value". If NULL, internal data will be taken.
 #' @return A vector of values for the emotions and valence
 #' detected in the input vector.
+#' @importFrom rlang .data
 #' @export
 get_nrc_values <- function(word_vector, language = "english", lexicon = NULL){
   if (is.null(lexicon)) {
-    lexicon <- dplyr::filter_(nrc, ~lang == language)
+    lexicon <- dplyr::filter(nrc, .data$lang == language)
   }
   # if (! all(c("word", "sentiment", "value") %in% names(lexicon)))
   #    stop("lexicon must have a 'word', a 'sentiment' and a 'value' field")
 
-  data <- dplyr::filter_(lexicon, ~word %in% word_vector)
-  data <- dplyr::group_by_(data, ~sentiment)
+  data <- dplyr::filter(lexicon, .data$word %in% word_vector)
+  data <- dplyr::group_by(data, .data$sentiment)
   data <- dplyr::summarise_at(data, "value", sum)
 
   all_sent <- unique(lexicon$sentiment)
   sent_present <- unique(data$sentiment)
   sent_absent  <- setdiff(all_sent, sent_present)
   if (length(sent_absent) > 0) {
-    missing_data <- dplyr::data_frame(sentiment = sent_absent, value = 0)
+    missing_data <- dplyr::tibble(sentiment = sent_absent, value = 0)
     data <- rbind(data, missing_data)
   }
   tidyr::spread_(data, "sentiment", "value")
@@ -314,14 +333,12 @@ get_percentage_values <- function(raw_values, bins = 100){
 #' where the coreNLP package is installed.
 #' @export 
 get_stanford_sentiment <- function(text_vector, path_to_stanford_tagger){
-  cmd <- paste(
-    'cd ', 
-    path_to_stanford_tagger, 
-    '; java -cp "*" -mx5g edu.stanford.nlp.sentiment.SentimentPipeline -stdin', 
-    sep=""
-  )
-  results <- system(cmd, input = text_vector, intern = TRUE, ignore.stderr = TRUE)
-  c_results <- gsub(".*Very positive", "1", results)
+  write(text_vector, file = file.path(getwd(), "temp_text.txt"))
+  cmd <- paste("cd ", path_to_stanford_tagger, "; java -cp \"*\" -Xmx5g edu.stanford.nlp.sentiment.SentimentPipeline -file ", file.path(getwd(), "temp_text.txt"), sep = "")
+  results <- system(cmd, intern = TRUE, ignore.stderr = TRUE)
+  file.remove(file.path(getwd(), "temp_text.txt"))
+  values <- results[seq(2, length(results), by = 2)]
+  c_results <- gsub(".*Very positive", "1", values)
   c_results <- gsub(".*Very negative", "-1", c_results)
   c_results <- gsub(".*Positive", "0.5", c_results)
   c_results <- gsub(".*Neutral", "0", c_results)
@@ -436,12 +453,13 @@ get_dct_transform <- function(raw_values, low_pass_size = 5, x_reverse_len = 100
 #' Get the sentiment dictionaries used in \pkg{syuzhet}.
 #' @param dictionary A string indicating which sentiment dictionary to return.  Options include "syuzhet", "bing", "afinn", and "nrc".
 #' @param language A string indicating the language to choose if using the NRC dictionary and a language other than English
-#' #' @return A \code{\link[base]{data.frame}} 
+#' @return A \code{\link[base]{data.frame}} 
 #' @examples
 #' get_sentiment_dictionary()
 #' get_sentiment_dictionary('bing')
 #' get_sentiment_dictionary('afinn')
 #' get_sentiment_dictionary('nrc', language = "spanish")
+#' @importFrom rlang .data
 #' @export
 #'
 get_sentiment_dictionary <- function(dictionary = 'syuzhet', language = 'english'){
@@ -453,7 +471,52 @@ get_sentiment_dictionary <- function(dictionary = 'syuzhet', language = 'english
         stop("Must be one of: 'syuzhet', 'bing', 'nrc', or 'afinn'")
     )
     if(dictionary == 'nrc'){
-      dict <- dplyr::filter_(dict, ~lang == language)
+      dict <- dplyr::filter(dict, .data$lang == language)
     }
     return(dict)
+}
+
+#' Mixed Messages
+#' @description
+#' This function calculates the "emotional entropy" of a string based on the amount of conflicting valence. Emotional entropy is a measure of unpredictability and surprise based on the consistency or inconsistency of the emotional language in a given string. A string with conflicting emotional language may be said to express a "mixed message."
+#' @param string A string of words
+#' @param remove_neutral Logical indicating whether or not to remove words with neutral valence before computing the emotional entropy of the string.  Default is TRUE
+#' @return A \code{\link[base]{vector}} containing two named values
+#' @examples
+#' text_v <- "That's the love and the hate of it" 
+#' mixed_messages(text_v) # [1] 1.0 0.5 = high (1.0, 0.5) entropy
+#' mixed_messages(text_v, TRUE)
+
+#' # Example of a predictable message i.e. no surprise
+#' text_v <- "I absolutley love, love, love it." 
+#' mixed_messages(text_v) # [1] 0 0 = low entropy e.g. totally consistent emotion, i.e. no surprise
+#' mixed_messages(text_v, FALSE)
+
+#' # A more realistic example with a lot of mixed emotion.
+#' text_v <- "I loved the way he looked at me but I hated that he was no longer my lover"
+#' mixed_messages(text_v) # [1] 0.91829583 0.05101644 pretty high entropy.
+#' mixed_messages(text_v, FALSE)
+
+#' # A more realistic example without a lot of mixed emotion.
+#' text_v <- "I loved the way he looked at me and I was happy that he was my lover."
+#' mixed_messages(text_v) # [1] 0 0 low entropy, no surprise.
+#' mixed_messages(text_v, FALSE)
+
+#' # An urealistic example with a lot of mixed emotion.
+#' text_v <- "I loved, hated and despised the way he looked at me and 
+#' I was happy as hell that he was my white hot lover."
+#' mixed_messages(text_v)
+#' mixed_messages(text_v, FALSE)
+#' @export
+
+mixed_messages <- function(string, remove_neutral = TRUE){
+  tokens <- get_tokens(string)
+  sen <- sign(get_sentiment(tokens))
+  if(remove_neutral){
+    sen <- sen[sen != 0] # By default remove neutral values. 
+  }
+  freqs <- table(sen)/length(sen)
+  entropy <- -sum(freqs * log2(freqs)) # shannon-entropy
+  metric_entropy <- entropy/length(tokens) # metric-entropy
+  c(entropy = entropy, metric_entropy = metric_entropy)
 }
