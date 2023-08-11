@@ -1,8 +1,8 @@
 Package: syuzhet
 Type: Package
 Title: Extracts Sentiment and Sentiment-Derived Plot Arcs from Text
-Version: 1.0.6
-Date: 2020-10-29
+Version: 1.0.7
+Date: 2023-8-11
 Authors@R: person("Matthew", "Jockers", email = "mjockers@gmail.com",
   role = c("aut", "cre"))
 Maintainer: Matthew Jockers <mjockers@gmail.com>
@@ -21,14 +21,13 @@ License: GPL-3
 Depends: R (>= 3.5.0)
 Imports: textshape (>= 1.3.0), NLP, zoo, dtt, stats, graphics, dplyr,
         tidyr, rlang
-LazyData: true
 Suggests: devtools, knitr, pander, parallel, readxl, rmarkdown,
         stringr, testthat (>= 0.9.1)
 NeedsCompilation: no
 VignetteBuilder: knitr
-RoxygenNote: 7.1.1
+RoxygenNote: 7.2.3
 Encoding: UTF-8
-Packaged: 2020-11-24 14:31:39 UTC; matthewjockers
+Packaged: 2023-08-11 21:24:23 UTC; matthewjockers
 Author: Matthew Jockers [aut, cre]
 Repository: CRAN
-Date/Publication: 2020-11-24 15:50:02 UTC
+Date/Publication: 2023-08-11 22:10:02 UTC
